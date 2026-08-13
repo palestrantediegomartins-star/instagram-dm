@@ -1,39 +1,29 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { createSessionValue, SESSION_COOKIE } from "@/lib/session";
-import { env } from "@/lib/env";
-import crypto from "node:crypto";
+import { revalidatePath } from "next/cache";
+import { db, logEvent } from "@/lib/supabase";
 
-function safeEqual(a: string, b: string): boolean {
-  const ha = crypto.createHash("sha256").update(a, "utf8").digest();
-  const hb = crypto.createHash("sha256").update(b, "utf8").digest();
-  return crypto.timingSafeEqual(ha, hb);
+export async function updateHourlyCap(formData: FormData): Promise<void> {
+  const cap = Math.max(1, Math.min(200, Number(formData.get("hourly_cap") ?? 60)));
+  const client = db();
+  await client
+    .from("ig_settings")
+    .upsert({ id: 1, hourly_cap: cap, updated_at: new Date().toISOString() }, { onConflict: "id" });
+  await logEvent(client, "info", "teto_por_hora_atualizado", { cap });
+  revalidatePath("/");
 }
 
-export async function login(
-  _prev: { error?: string } | undefined,
-  formData: FormData
-): Promise<{ error?: string }> {
-  const password = String(formData.get("password") ?? "");
-  if (!password || !safeEqual(password, env("PANEL_PASSWORD"))) {
-    return { error: "Senha incorreta. Tente de novo." };
-  }
-  const value = await createSessionValue(env("SESSION_SECRET"));
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, value, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 30 * 24 * 60 * 60,
-  });
-  redirect("/");
-}
-
-export async function logout(): Promise<void> {
-  const jar = await cookies();
-  jar.delete(SESSION_COOKIE);
-  redirect("/login");
+export async function disconnectInstagram(): Promise<void> {
+  const client = db();
+  await client
+    .from("ig_settings")
+    .update({
+      access_token: null,
+      token_obtained_at: null,
+      token_expires_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", 1);
+  await logEvent(client, "warn", "instagram_desconectado", {});
+  revalidatePath("/");
 }
