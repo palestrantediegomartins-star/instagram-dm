@@ -1,70 +1,75 @@
-import { db } from "@/lib/supabase";
+import Link from "next/link";
+import { db, Automation } from "@/lib/supabase";
+import { deleteAutomation, toggleAutomation } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const LABELS: Record<string, string> = {
-  comentario_enfileirado: "Comentário casou com palavra-chave — DM na fila",
-  dm_enfileirada: "DM recebida casou com palavra-chave — resposta na fila",
-  mensagem_enviada: "Mensagem enviada",
-  falha_envio: "Falha ao enviar (vai tentar de novo)",
-  token_renovado: "Token do Instagram renovado",
-  falha_renovar_token: "Falha ao renovar o token",
-  instagram_conectado: "Instagram conectado",
-  instagram_desconectado: "Instagram desconectado",
-  falha_conectar_instagram: "Falha ao conectar o Instagram",
-  webhook_erro: "Erro ao processar evento recebido",
-  automacao_criada: "Automação criada",
-  automacao_atualizada: "Automação atualizada",
-  automacao_excluida: "Automação excluída",
-  teto_por_hora_atualizado: "Teto de envios por hora atualizado",
-  falha_pegar_lote: "Erro interno na fila",
-};
-
-export default async function ActivityPage() {
+export default async function AutomationsPage() {
   const { data } = await db()
-    .from("event_log")
+    .from("automations")
     .select("*")
-    .order("at", { ascending: false })
-    .limit(100);
-
-  const rows = data ?? [];
+    .order("created_at", { ascending: false });
+  const automations = (data ?? []) as Automation[];
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Atividade (últimos 100 eventos)</h1>
-      {rows.length === 0 && (
-        <p className="text-slate-400">Nada por aqui ainda.</p>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Automações</h1>
+        <Link
+          href="/automations/new"
+          className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium"
+        >
+          + Nova automação
+        </Link>
+      </div>
+
+      {automations.length === 0 && (
+        <p className="text-slate-400">
+          Nenhuma automação ainda. Crie a primeira: escolha uma palavra-chave e a
+          mensagem com o seu link.
+        </p>
       )}
-      <ul className="space-y-2">
-        {rows.map((r) => (
+
+      <ul className="space-y-3">
+        {automations.map((a) => (
           <li
-            key={r.id}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm"
+            key={a.id}
+            className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center gap-4 flex-wrap"
           >
-            <div className="flex items-center gap-3">
-              <span
-                className={
-                  r.level === "error"
-                    ? "text-red-400"
-                    : r.level === "warn"
-                      ? "text-amber-400"
-                      : "text-emerald-400"
-                }
-              >
-                ●
-              </span>
-              <span className="flex-1">{LABELS[r.event] ?? r.event}</span>
-              <span className="text-slate-500">
-                {new Date(r.at).toLocaleString("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                })}
-              </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">
+                {a.name}{" "}
+                <span
+                  className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                    a.active
+                      ? "bg-emerald-900/60 text-emerald-300"
+                      : "bg-slate-800 text-slate-400"
+                  }`}
+                >
+                  {a.active ? "ativa" : "pausada"}
+                </span>
+              </p>
+              <p className="text-sm text-slate-400 truncate">
+                Palavras: {a.keywords.join(", ")}
+                {a.media_id ? " · só em 1 post" : " · todos os posts"}
+              </p>
             </div>
-            {r.detail && (
-              <pre className="mt-1 ml-6 text-xs text-slate-500 whitespace-pre-wrap break-all">
-                {JSON.stringify(r.detail)}
-              </pre>
-            )}
+            <form action={toggleAutomation.bind(null, a.id, !a.active)}>
+              <button className="text-sm border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-1.5">
+                {a.active ? "Pausar" : "Ativar"}
+              </button>
+            </form>
+            <Link
+              href={`/automations/${a.id}`}
+              className="text-sm border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-1.5"
+            >
+              Editar
+            </Link>
+            <form action={deleteAutomation.bind(null, a.id)}>
+              <button className="text-sm text-red-400 border border-red-900 hover:border-red-700 rounded-lg px-3 py-1.5">
+                Excluir
+              </button>
+            </form>
           </li>
         ))}
       </ul>
