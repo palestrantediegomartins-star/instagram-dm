@@ -1,129 +1,73 @@
-import { db, getSettings } from "@/lib/supabase";
-import { updateHourlyCap, disconnectInstagram } from "./actions";
-import Link from "next/link";
+import { db } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-function Card({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-      <h2 className="text-sm font-medium text-slate-400 mb-3">{title}</h2>
-      {children}
-    </section>
-  );
-}
+const LABELS: Record<string, string> = {
+  comentario_enfileirado: "Comentário casou com palavra-chave — DM na fila",
+  dm_enfileirada: "DM recebida casou com palavra-chave — resposta na fila",
+  mensagem_enviada: "Mensagem enviada",
+  falha_envio: "Falha ao enviar (vai tentar de novo)",
+  token_renovado: "Token do Instagram renovado",
+  falha_renovar_token: "Falha ao renovar o token",
+  instagram_conectado: "Instagram conectado",
+  instagram_desconectado: "Instagram desconectado",
+  falha_conectar_instagram: "Falha ao conectar o Instagram",
+  webhook_erro: "Erro ao processar evento recebido",
+  automacao_criada: "Automação criada",
+  automacao_atualizada: "Automação atualizada",
+  automacao_excluida: "Automação excluída",
+  teto_por_hora_atualizado: "Teto de envios por hora atualizado",
+  falha_pegar_lote: "Erro interno na fila",
+};
 
-export default async function Dashboard({
-  searchParams,
-}: {
-  searchParams: Promise<{ conectado?: string; erro?: string }>;
-}) {
-  const sp = await searchParams;
-  const client = db();
-  const settings = await getSettings(client).catch(() => null);
-  const connected = Boolean(settings?.access_token);
+export default async function ActivityPage() {
+  const { data } = await db()
+    .from("event_log")
+    .select("*")
+    .order("at", { ascending: false })
+    .limit(100);
 
-  const [pending, sentToday, autosCount] = await Promise.all([
-    client
-      .from("send_queue")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending"),
-    client
-      .from("send_queue")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "sent")
-      .gte("sent_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
-    client
-      .from("automations")
-      .select("id", { count: "exact", head: true })
-      .eq("active", true),
-  ]);
-
-  const tokenExpiry = settings?.token_expires_at
-    ? new Date(settings.token_expires_at).toLocaleDateString("pt-BR")
-    : null;
+  const rows = data ?? [];
 
   return (
     <div className="space-y-6">
-      {sp.conectado && (
-        <p className="rounded-lg bg-emerald-900/40 border border-emerald-700 px-4 py-3 text-sm text-emerald-300">
-          Instagram conectado com sucesso! 🎉
-        </p>
+      <h1 className="text-xl font-semibold">Atividade (últimos 100 eventos)</h1>
+      {rows.length === 0 && (
+        <p className="text-slate-400">Nada por aqui ainda.</p>
       )}
-      {sp.erro && (
-        <p className="rounded-lg bg-red-900/30 border border-red-800 px-4 py-3 text-sm text-red-300">
-          Erro ao conectar: {sp.erro}
-        </p>
-      )}
-
-      <Card title="Conta do Instagram">
-        {connected ? (
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <p className="text-lg font-semibold">@{settings?.username}</p>
-              <p className="text-sm text-slate-400">
-                Conectado · token renova sozinho{tokenExpiry ? ` (válido até ${tokenExpiry})` : ""}
-              </p>
-            </div>
-            <form action={disconnectInstagram}>
-              <button className="text-sm text-red-400 hover:text-red-300 border border-red-900 rounded-lg px-3 py-1.5">
-                Desconectar
-              </button>
-            </form>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <p className="text-slate-300">Nenhuma conta conectada ainda.</p>
-            <a
-              href="/api/auth/instagram"
-              className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium"
-            >
-              Conectar Instagram
-            </a>
-          </div>
-        )}
-      </Card>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card title="Automações ativas">
-          <p className="text-3xl font-semibold">{autosCount.count ?? 0}</p>
-          <Link
-            href="/automations"
-            className="text-sm text-emerald-400 hover:underline"
+      <ul className="space-y-2">
+        {rows.map((r) => (
+          <li
+            key={r.id}
+            className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm"
           >
-            gerenciar →
-          </Link>
-        </Card>
-        <Card title="DMs enviadas hoje">
-          <p className="text-3xl font-semibold">{sentToday.count ?? 0}</p>
-        </Card>
-        <Card title="Na fila agora">
-          <p className="text-3xl font-semibold">{pending.count ?? 0}</p>
-        </Card>
-      </div>
-
-      <Card title="Proteção da conta — teto de envios por hora">
-        <form action={updateHourlyCap} className="flex items-center gap-3">
-          <input
-            type="number"
-            name="hourly_cap"
-            min={1}
-            max={200}
-            defaultValue={settings?.hourly_cap ?? 60}
-            className="w-24 rounded-lg bg-slate-950 border border-slate-700 px-3 py-2"
-          />
-          <span className="text-sm text-slate-400">mensagens por hora, no máximo</span>
-          <button className="ml-auto rounded-lg border border-slate-700 hover:border-slate-500 px-4 py-2 text-sm">
-            Salvar
-          </button>
-        </form>
-      </Card>
+            <div className="flex items-center gap-3">
+              <span
+                className={
+                  r.level === "error"
+                    ? "text-red-400"
+                    : r.level === "warn"
+                      ? "text-amber-400"
+                      : "text-emerald-400"
+                }
+              >
+                ●
+              </span>
+              <span className="flex-1">{LABELS[r.event] ?? r.event}</span>
+              <span className="text-slate-500">
+                {new Date(r.at).toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                })}
+              </span>
+            </div>
+            {r.detail && (
+              <pre className="mt-1 ml-6 text-xs text-slate-500 whitespace-pre-wrap break-all">
+                {JSON.stringify(r.detail)}
+              </pre>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
