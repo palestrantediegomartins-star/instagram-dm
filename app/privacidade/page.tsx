@@ -49,12 +49,7 @@ export default function PrivacidadePage() {
         <p>
           Você pode solicitar a exclusão dos seus dados a qualquer momento
           enviando um e-mail para{" "}
-          
-            href="mailto:palestrantediegomartins@gmail.com"
-            className="text-emerald-600 underline"
-          >
-            palestrantediegomartins@gmail.com
-          </a>{" "}
+          <a href="mailto:palestrantediegomartins@gmail.com" className="text-emerald-600 underline">palestrantediegomartins@gmail.com</a>{" "}
           com o seu nome de usuário do Instagram. Atenderemos a solicitação em
           até 7 dias. Ao remover o acesso do aplicativo nas configurações do seu
           Instagram, novos dados deixam de ser coletados.
@@ -63,13 +58,7 @@ export default function PrivacidadePage() {
         <h2 className="text-lg font-semibold">Contato</h2>
         <p>
           Dúvidas sobre esta política podem ser enviadas para{" "}
-          
-            href="mailto:palestrantediegomartins@gmail.com"
-            className="text-emerald-600 underline"
-          >
-            palestrantediegomartins@gmail.com
-          </a>
-          .
+          <a href="mailto:palestrantediegomartins@gmail.com" className="text-emerald-600 underline">palestrantediegomartins@gmail.com</a>.
         </p>
       </div>
     </main>
